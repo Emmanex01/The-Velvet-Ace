@@ -59,6 +59,93 @@ pub mod actions {
     pub const DECK: felt252 = 'DECK';
     pub const MAX_NO_OF_CHIPS: u128 = 100000; /// for test, 1 chip = 1 usd.
 
+    #[event]
+    #[derive(Drop, starknet::Event)]
+    enum ContractEvent {
+        GameInitialized: GameInitialized,
+        PlayerJoined: PlayerJoined,
+        PlayerLefted: PlayerLefted,
+        PlayerCalled: PlayerCalled,
+        PlayerFolded: PlayerFolded,
+        PlayerRaised: PlayerRaised,
+        PlayerAllIn: PlayerAllIn,
+        BoughtChip: BoughtChip,
+        HandDealt: HandDealt,
+        RoundResolved: RoundResolved
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct GameInitialized {
+        #[key]
+        game_id: u64,
+        params: GameParams,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct PlayerJoined {
+        #[key]
+        game_id: u64,
+        player: ContractAddress, // Use `key` for efficient filtering
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct PlayerLefted {
+        #[key]
+        game_id: u64,
+        player: ContractAddress, 
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct PlayerCalled {
+        #[key]
+        game_id: u64,
+        player: ContractAddress, 
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct PlayerFolded {
+        #[key]
+        game_id: u64,
+        player: ContractAddress, 
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct PlayerRaised {
+        #[key]
+        game_id: u64,
+        no_of_chips: u256, 
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct PlayerAllIn {
+        #[key]
+        game_id: u64,
+        player: ContractAddress, 
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct BoughtChip {
+        #[key]
+        game_id: u64,
+        no_of_chips: u256, 
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct HandDealt {
+        #[key]
+        game_id: u64,         // Indexed for filtering
+        #[key]
+        player: ContractAddress, // Player receiving the hand
+        hand: Array<u64>,     // Array of card IDs dealt (e.g., [card1_id, card2_id])
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct RoundResolved {
+        #[key]
+        game_id: u64,
+        is_open: bool
+    }
+
     #[abi(embed_v0)]
     impl ActionsImpl of super::IActions<ContractState> {
         fn initialize_game(ref self: ContractState, game_params: Option<GameParams>) -> u64 {
@@ -98,6 +185,9 @@ pub mod actions {
             };
 
             game_id
+
+            // emit Event
+            self.emit(GameInitialized{game_id, params: game_params.unwrap()})
         }
 
         fn join_game(
@@ -117,6 +207,8 @@ pub mod actions {
         // set player_in_round to true
 
         // when max number of participants have been reached, emit a GameStarted event
+
+            self.emit(PlayerJoined{game_id, ContractAddress})
         }
 
         fn leave_game(ref self: ContractState) { // assert if the player exists
@@ -126,22 +218,41 @@ pub mod actions {
         // Check if the player is in the game
 
         // Emit an event here
+            self.emit(PlayerLefted{game_id, ContractAddress})
         }
 
-        fn check(ref self: ContractState) {}
+        fn check(ref self: ContractState) {
+        // Emit an event here
+            self.emit(PlayerChecked{game_id, ContractAddress})
+        }
 
-        fn call(ref self: ContractState) {}
+        fn call(ref self: ContractState) {
+            // Emit an event here
+            self.emit(PlayerCalled{game_id, ContractAddress})
+        }
 
-        fn fold(ref self: ContractState) {}
+        fn fold(ref self: ContractState) {
+            // Emit an event here
+            self.emit(PlayerFolded{game_id, ContractAddress})
+        }
 
-        fn raise(ref self: ContractState, no_of_chips: u256) {}
+        fn raise(ref self: ContractState, no_of_chips: u256) {
+            // Emit an event here
+            self.emit(PlayerRaised{game_id, no_of_chips})
+        }
 
         fn all_in(ref self: ContractState) { //
         // deduct all available no. of chips
+
+        // Emit an event here
+            self.emit(PlayerAllIn{game_id, ContractAddress})
         }
 
         fn buy_chips(ref self: ContractState, no_of_chips: u256) { // use a crate here
         // a package would be made for all transactions and nfts out of this contract package.
+
+        // Emit an event here
+        self.emit(BoughtChip{game_id, no_of_chips})
         }
 
         fn get_dealer(self: @ContractState) -> Option<Player> {
@@ -278,6 +389,12 @@ pub mod actions {
                 world.write_model(@hand);
                 world.write_model(player);
             };
+
+            // event emitted
+            self.emit(HandDealt { 
+                game_id, 
+                player: *player.id,
+            });
         }
 
         fn _resolve_hands(
@@ -354,6 +471,7 @@ pub mod actions {
         // increment number of rounds,
         // emit an event that a game_id round is open for others to join, only if necessary game
         // param checks have been cleared.
+            self.emit(RoundResolved{game_id, is_open})
         }
 
         fn _deal_community_card(
